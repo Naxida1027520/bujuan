@@ -1,0 +1,45 @@
+name: Auto Fix Submodule
+
+on:
+  workflow_dispatch: # 允许你手动点击运行
+
+permissions:
+  contents: write # 允许脚本直接修改并提交你的仓库
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: feature/new-ui
+          submodules: false # 坚决不拉取那个损坏的子模块
+
+      - name: Fix broken submodule
+        run: |
+          # 1. 删掉 Git 缓存里的快捷方式
+          git rm --cached plugin/bujuan_music_api || true
+          # 2. 在配置文件中删掉损坏的子模块记录
+          if [ -f .gitmodules ]; then
+            git config -f .gitmodules --remove-section submodule.plugin/bujuan_music_api || true
+          fi
+          # 3. 物理删除这个空文件夹
+          rm -rf plugin/bujuan_music_api
+
+      - name: Fetch actual files from upstream
+        run: |
+          # 直接去原作者仓库把真正的代码下载下来
+          git clone --depth 1 -b feature/new-ui https://github.com/2697a/bujuan.git /tmp/upstream
+          # 把真正的文件复制到你的仓库里
+          mkdir -p plugin
+          cp -r /tmp/upstream/plugin/bujuan_music_api plugin/
+
+      - name: Commit and push
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git add .
+          # 如果有改动就提交并推送
+          git commit -m "Auto-fix: Replace broken submodule with actual files" || true
+          git push origin feature/new-ui
