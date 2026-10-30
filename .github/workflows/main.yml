@@ -6,7 +6,7 @@ on:
 jobs:
   build-ios:
     name: Build iOS Unsigned IPA
-    runs-on: macos-latest
+    runs-on: macos-13 # 使用 Intel 机器，排队相对较快
 
     steps:
       - name: Checkout repository
@@ -20,8 +20,13 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build iOS (no codesign)
-        run: flutter build ios --release --no-codesign
+      - name: Build iOS (with auto-retry)
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 60
+          max_attempts: 3
+          retry_on: error
+          command: flutter build ios --release --no-codesign
 
       - name: Package into IPA
         run: |
